@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_extensions',
     'rest_framework',
     'oauth2_provider',
     'tickets',
@@ -55,6 +56,7 @@ REST_FRAMEWORK = {
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'tickets.middleware.RateLimitMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -81,6 +83,11 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'sentinel.wsgi.application'
+SECURE_SSL_REDIRECT = True
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_HTTPONLY = True
 
 JWT_SECRET = "LSe0qSEAN1iH7b-oZlNccUxvfVdFDqIJP3YfN3UuiDk"
 
