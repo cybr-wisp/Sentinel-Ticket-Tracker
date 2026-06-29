@@ -41,9 +41,17 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'oauth2_provider',
     'tickets',
     'oauth',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'oauth2_provider.contrib.rest_framework.OAuth2Authentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -74,6 +82,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'sentinel.wsgi.application'
 
+JWT_SECRET = "LSe0qSEAN1iH7b-oZlNccUxvfVdFDqIJP3YfN3UuiDk"
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
