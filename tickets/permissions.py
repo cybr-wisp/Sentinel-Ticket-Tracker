@@ -24,12 +24,10 @@ class IsOwnerOrAdmin(BasePermission):
 
 
 class IsAdminOrReadOnly(BasePermission):
+    """Policy: any authenticated user may read; only staff may write (create, edit, delete)."""
 
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
             return True
-        elif request.method == 'POST':
-            return request.user.is_authenticated
-        else:
-            # PUT, PATCH, DELETE
-            return request.user.is_authenticated and request.user.is_staff
+        # Any write: POST, PUT, PATCH, DELETE
+        return request.user.is_authenticated and request.user.is_staff

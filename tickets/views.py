@@ -8,16 +8,17 @@ from rest_framework import viewsets
 from .models import Ticket, Project, Comment
 from .serializers import ProjectSerializer, TicketSerializer, CommentSerializer
 from .permissions import IsOwnerOrAdmin, IsAdminOrReadOnly
+from rest_framework.permissions import IsAuthenticated
 
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
 
 class TicketViewSet(viewsets.ModelViewSet):
     queryset = Ticket.objects.all()
     serializer_class = TicketSerializer
-    permission_classes = [IsOwnerOrAdmin]
+    permission_classes = [IsOwnerOrAdmin, IsAuthenticated]
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
@@ -25,4 +26,4 @@ class TicketViewSet(viewsets.ModelViewSet):
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
