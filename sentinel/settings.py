@@ -35,6 +35,13 @@ ALLOWED_HOSTS = [
     if h.strip()
 ]
 
+# --- Security headers ---
+SECURE_HSTS_SECONDS = 31536000            # 1 year; tells browsers "always use HTTPS"
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_CONTENT_TYPE_NOSNIFF = True        # X-Content-Type-Options: nosniff
+SECURE_REFERRER_POLICY = 'same-origin'
+
 
 # Application definition
 INSTALLED_APPS = [
