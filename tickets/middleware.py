@@ -3,15 +3,16 @@
 import redis
 from django.http import JsonResponse
 import logging
+from django.conf import settings
 
 
 logger = logging.getLogger(__name__)
 
 # Connect to Redis - opens up a TCP connection 
 redis_client = redis.Redis(
-    host="localhost",
-    port=6379,
-    db=0
+    host=settings.REDIS_HOST,
+    port=settings.REDIS_PORT,
+    db=0,
 )
 
 class RateLimitMiddleware:
