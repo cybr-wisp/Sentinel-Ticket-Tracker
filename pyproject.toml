@@ -1,0 +1,9 @@
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+
+[tool.ruff.lint]
+# Start with the essentials; expand later.
+select = ["E", "F", "W", "I"]   # pycodestyle errors, pyflakes, warnings, import sorting
+ignore = ["E501"]                # don't fail on line length to start
