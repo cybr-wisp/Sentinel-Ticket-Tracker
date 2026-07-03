@@ -1,0 +1,51 @@
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: sentinel_ticket_db
+          POSTGRES_USER: sentinel_ticket_user
+          POSTGRES_PASSWORD: ci-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sentinel_ticket_user"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_NAME: sentinel_ticket_db
+      DB_USER: sentinel_ticket_user
+      DB_PASSWORD: ci-test-password
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      SECRET_KEY: ci-only-not-a-real-secret
+      DEBUG: "True"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite with coverage gate
+        run: pytest --cov=tickets --cov=sentinel --cov-report=term-missing
