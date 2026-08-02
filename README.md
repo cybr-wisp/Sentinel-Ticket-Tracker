@@ -1,100 +1,343 @@
-
-![CI](https://github.com/cybr-wisp/Sentinel-Ticket-Tracker/actions/workflows/ci.yml/badge.svg)
-
 # Sentinel Ticket Tracker
 
-![CI](https://github.com/cybr-wisp/Sentinel-Ticket-Tracker/actions/workflows/ci.yml/badge.svg)
+A security-hardened defect-tracking REST API built with Django and Django REST Framework.
 
-A security-hardened defect-tracking REST API built with Django and Django REST Framework, developed with an adversarial testing mindset: every architectural decision is enforced by a test, and the test suite has already caught and fixed three real security findings in this codebase.
+Sentinel was developed with an adversarial testing mindset: security requirements are encoded as automated tests, and the test suite has already uncovered and prevented three real authorization and data-integrity vulnerabilities in the codebase.
 
-<!-- CHECK: add live URL once Render deploy is done -->
-**Live demo:** _coming soon_ · **Stack:** Django · DRF · PostgreSQL · Redis · OAuth2 (PKCE) · Docker · GitHub Actions
+**Live demo:** Coming soon
+**Stack:** Python · Django · Django REST Framework · PostgreSQL · Redis · OAuth 2.0 with PKCE · Docker · GitHub Actions
 
 ---
 
-## What it does
+## Overview
 
-Sentinel is a multi-project defect tracker: projects contain tickets, tickets carry status/priority and ownership, and tickets have comment threads. All access is through a REST API protected by OAuth2 (authorization code + PKCE) with object-level ownership permissions.
+Sentinel is a multi-project defect and ticket tracking system.
 
-## Security posture
+Projects contain tickets, tickets include status, priority, ownership, and assignment information, and each ticket can contain a threaded discussion through comments.
 
-This project treats security as the feature, not an afterthought:
+All application access is provided through a REST API protected by OAuth 2.0 authorization-code authentication with PKCE and object-level authorization rules.
 
-- **Private-by-default API.** Every endpoint requires authentication. Object-level rules layer on top: users own their tickets; admins (staff) hold elevated rights; ticket deletion is reserved for staff so tickets function as audit records.
-- **OAuth2 with PKCE**, via `django-oauth-toolkit`, including token revocation. Client secrets are hashed at rest by the library.
-- **TLS in development** (self-signed certs, gitignored), `SECURE_SSL_REDIRECT`, and all secure cookie flags (`Secure`, `HttpOnly`) enabled and tested.
-- **CSRF protection verified two independent ways** in tests.
-- **Hand-written Redis rate limiter** on credential-submission endpoints (login, token exchange): 5 POSTs per 60s per IP per path. Designed deliberately:
-  - *Fails open* — if Redis is unreachable, authentication stays available (rate limiting is defense-in-depth, not the primary control), and the degradation is logged.
-  - TTL set with `EXPIRE ... NX` on every request, closing the classic INCR/EXPIRE crash race and self-healing lost TTLs.
-  - Scoped to POST only — loading a login page is not an attack.
+### Core capabilities
 
-## Test suite: 52 tests, 95% coverage, 100% on the auth-critical path
+* Multi-project ticket management
+* Ticket status, priority, ownership, and assignment tracking
+* Ticket comment threads
+* OAuth 2.0 authorization-code authentication with PKCE
+* Role-based and object-level permissions
+* Redis-backed rate limiting
+* PostgreSQL persistence
+* Automated integration, authorization, and security testing
+* Dockerized local development
+* Continuous integration with GitHub Actions
 
-Coverage is enforced in CI on every push (`--cov-fail-under=85`). The security-critical files — permissions, middleware, views, serializers, models, settings — sit at **100%**.
+---
 
-Highlights of what the suite actually proves:
+## Security Model
 
-- **Full OAuth2 authorization-code + PKCE flow end to end**, plus explicit rejection tests: expired, tampered, missing, and revoked tokens, and a wrong PKCE verifier at token exchange.
-- **IDOR coverage**: a valid user cannot read-modify-delete another user's tickets by ID — proven over both session auth *and* Bearer tokens (the permission layer is authentication-method invariant).
-- **Mass-assignment defense**: a create payload claiming `created_by: <someone else>` is ignored; ownership always derives from the authenticated requester.
-- **Rate limiter behavior**: 429 on the 6th attempt, independent per-IP and per-path buckets, TTL invariant, and graceful fail-open under a simulated Redis outage.
-- **Transport & session hardening**: HTTPS redirect, cookie flags, CSRF enforcement.
+Security is treated as a core application requirement rather than a final deployment step.
 
-### Three real findings caught by this suite
+### Private-by-default API
 
-The tests were written against *intent*, and three times reality disagreed:
+Every API endpoint requires authentication.
 
-1. **Schema bug** — `Comment.author` was a `CharField` storing a copy of the username: no referential integrity, no `SET_NULL` semantics. Converted to a proper FK with a migration.
-2. **Information disclosure** — after locking down tickets, coverage analysis of the permission layer revealed the project and comment endpoints still allowed anonymous reads. Closed and permanently pinned by tests.
-3. **Privilege escalation** — a permission class named "admin or read-only" allowed *any* authenticated user to create projects (the staff check only guarded edits). Fixed so all writes require staff.
+Object-level authorization rules are applied after authentication:
 
-## Architecture decisions
+* Users may access tickets they own
+* Staff users receive elevated administrative permissions
+* Ticket deletion is restricted to staff
+* Ticket ownership is derived from the authenticated requester rather than client-supplied input
 
-- **`on_delete` as a per-relationship judgment**: ownership/authorship links (`Ticket.created_by`, `Comment.author`) use `SET_NULL` — records are history and outlive their author. Containment links (`Ticket.project`, `Comment.ticket`) use `CASCADE` — a child is meaningless without its parent.
-- **Built-in `is_staff` as the role flag** rather than a custom user model — avoids a migration-breaking retroactive change for a two-role system.
-- **`django-oauth-toolkit` over hand-rolled auth** — implementing OAuth2 from scratch is an anti-pattern; PKCE is enabled even though optional for confidential clients.
-- **Hand-written rate-limit middleware over `django-ratelimit`** — chosen for learning value; the fail-open/fail-closed decision and the INCR/EXPIRE race are documented above.
-- **Least-privilege test database**: the app's Postgres role cannot `CREATEDB`; the test database is pre-created by a superuser and reused (`--reuse-db`). In CI, an ephemeral Postgres container makes this moot — strict where it matters, pragmatic where it doesn't.
-- **One `.env`, two environments**: settings read `os.environ` with localhost defaults; Docker Compose surgically overrides `DB_HOST`/`REDIS_HOST` to service names. Same codebase runs natively and containerized with no flags.
+Restricting ticket deletion allows tickets to function as persistent audit records.
 
-<!-- CHECK: consider adding your architecture diagram here: ![Architecture](docs/architecture.png) -->
+### OAuth 2.0 with PKCE
 
-## Running it
+Authentication is implemented using `django-oauth-toolkit` and the OAuth 2.0 authorization-code flow with Proof Key for Code Exchange.
 
-**With Docker (recommended):**
+The implementation includes:
+
+* Authorization-code authentication
+* PKCE verification
+* Access-token validation
+* Token revocation
+* Explicit rejection of expired, malformed, tampered, missing, and revoked tokens
+
+OAuth functionality is delegated to a maintained library rather than implemented from scratch.
+
+### Transport and session hardening
+
+The application enables and tests:
+
+* HTTPS redirection
+* Secure cookies
+* HTTP-only cookies
+* CSRF protection
+* TLS-enabled local development using gitignored self-signed certificates
+
+### Redis-backed rate limiting
+
+Credential-submission endpoints are protected by a custom Redis-backed rate limiter.
+
+The limiter allows:
+
+* **5 POST requests**
+* **Per 60-second window**
+* **Per IP address**
+* **Per request path**
+
+The implementation is intentionally restricted to POST requests so ordinary login-page requests are not counted as authentication attempts.
+
+#### Failure behavior
+
+The limiter fails open when Redis is unavailable.
+
+Authentication therefore remains available during a Redis outage, while the degraded rate-limiting state is recorded in application logs. Rate limiting is treated as defense in depth rather than the primary authentication control.
+
+#### TTL safety
+
+The limiter uses Redis increment and expiry operations with `EXPIRE ... NX` on every request.
+
+This design:
+
+* Prevents counters from persisting indefinitely
+* Reduces the impact of an interruption between increment and expiry operations
+* Restores missing expiration values automatically
+
+---
+
+## Testing and Verification
+
+The project currently includes:
+
+* **52 automated tests**
+* **95% overall test coverage**
+* **100% coverage across authentication-critical components**
+* **An enforced CI coverage threshold of 85%**
+
+The following areas are maintained at 100% coverage:
+
+* Permissions
+* Middleware
+* Views
+* Serializers
+* Models
+* Security-related settings
+
+Tests run automatically in GitHub Actions on every push.
 
 ```bash
-cp .env.example .env        # fill in values
+pytest --cov --cov-fail-under=85
+```
+
+### What the suite verifies
+
+#### OAuth 2.0 and PKCE
+
+The suite exercises the complete authorization-code and PKCE flow from authorization through token exchange.
+
+It also verifies rejection of:
+
+* Expired access tokens
+* Tampered access tokens
+* Missing tokens
+* Revoked tokens
+* Incorrect PKCE verifiers
+
+#### Object-level authorization and IDOR prevention
+
+A valid authenticated user cannot read, modify, or delete another user's tickets by directly requesting their object identifiers.
+
+These controls are tested with both:
+
+* Session authentication
+* OAuth 2.0 bearer-token authentication
+
+This demonstrates that authorization behavior remains consistent across authentication methods.
+
+#### Mass-assignment prevention
+
+Client-supplied ownership fields are ignored during ticket creation.
+
+For example, a payload containing:
+
+```json
+{
+  "created_by": "another-user"
+}
+```
+
+cannot assign ownership to another account. Ownership is always derived from the authenticated requester.
+
+#### Rate-limiter behavior
+
+The tests verify:
+
+* A `429 Too Many Requests` response on the sixth attempt
+* Independent buckets for separate IP addresses
+* Independent buckets for separate request paths
+* Correct expiration behavior
+* Graceful fail-open behavior during a simulated Redis outage
+
+#### Transport and session security
+
+The suite verifies:
+
+* HTTPS redirection
+* Secure cookie configuration
+* HTTP-only cookie configuration
+* CSRF enforcement
+
+---
+
+## Security Findings Discovered During Development
+
+The tests were written against intended security behavior rather than the existing implementation. In three cases, the implementation failed those expectations and exposed real defects.
+
+| Finding                                                                           | Risk                                                            | Resolution                                                               |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `Comment.author` stored usernames in a `CharField`                                | No referential integrity and no reliable user-deletion behavior | Replaced with a foreign key and added a database migration               |
+| Project and comment endpoints allowed anonymous reads                             | Unauthorized information disclosure                             | Applied authentication requirements and added permanent regression tests |
+| An “admin or read-only” permission allowed authenticated users to create projects | Privilege escalation through unintended write access            | Restricted all project write operations to staff users                   |
+
+These findings are now permanently covered by regression tests.
+
+---
+
+## Architecture Decisions
+
+### Relationship-specific deletion behavior
+
+Deletion behavior is selected according to the meaning of each relationship.
+
+Ownership and authorship relationships use `SET_NULL`:
+
+* `Ticket.created_by`
+* `Comment.author`
+
+Tickets and comments are historical records and should remain available after the originating user account is deleted.
+
+Containment relationships use `CASCADE`:
+
+* `Ticket.project`
+* `Comment.ticket`
+
+A ticket has no meaning without its project, and a comment has no meaning without its ticket.
+
+### Built-in staff roles
+
+Sentinel uses Django's built-in `is_staff` field rather than introducing a custom user model.
+
+The application currently requires only two authorization levels:
+
+* Standard user
+* Staff administrator
+
+Using the built-in role system avoids a migration-heavy custom user implementation that would provide little additional value for the current requirements.
+
+### Maintained OAuth implementation
+
+OAuth 2.0 is implemented through `django-oauth-toolkit`.
+
+Authentication and token handling are not implemented manually because security-sensitive protocol implementations should rely on maintained, tested libraries whenever possible.
+
+PKCE is enabled to strengthen the authorization-code exchange.
+
+### Custom rate-limit middleware
+
+The rate limiter was implemented directly rather than through `django-ratelimit` to explore:
+
+* Redis-backed request counting
+* Per-IP and per-path bucket design
+* Fail-open versus fail-closed behavior
+* Expiration handling
+* Counter and TTL race conditions
+
+The resulting design decisions are documented and covered by automated tests.
+
+### Least-privilege test database
+
+The application's PostgreSQL role does not have `CREATEDB` privileges.
+
+For native development:
+
+* The test database is created separately by a privileged PostgreSQL user
+* Tests reuse the existing database with `--reuse-db`
+
+In CI, GitHub Actions starts an isolated PostgreSQL service container, allowing tests to run in an ephemeral environment.
+
+### Shared configuration across environments
+
+The application uses one environment-variable-based settings system for both native and containerized development.
+
+Local defaults use standard localhost addresses. Docker Compose overrides only the required service locations, including:
+
+* `DB_HOST`
+* `REDIS_HOST`
+
+The same application code therefore runs natively and in Docker without environment-specific feature flags.
+
+---
+
+## Getting Started
+
+### Docker setup
+
+Docker is the recommended way to run Sentinel locally.
+
+```bash
+cp .env.example .env
+```
+
+Update the required values in `.env`, then build and start the services:
+
+```bash
 docker compose up --build
+```
+
+Apply database migrations:
+
+```bash
 docker compose exec app python manage.py migrate
+```
+
+Create an administrative account:
+
+```bash
 docker compose exec app python manage.py createsuperuser
 ```
 
-API at `http://localhost:8000/api/` (401 for anonymous requests is the permission layer working).
+The API is available at:
 
-**Tests (native):**
+```text
+http://localhost:8000/api/
+```
+
+An anonymous request should receive a `401 Unauthorized` response. This confirms that the private-by-default permission policy is active.
+
+### Running tests locally
+
+Install the project dependencies:
 
 ```bash
 pip install -r requirements.txt
-pytest          # 52 tests; coverage gate at 85% enforced
 ```
 
-Requires local PostgreSQL; see `.env.example` for configuration. Redis is not required for tests (`fakeredis` is injected via an autouse fixture).
+Run the test suite:
 
-## Known limitations
+```bash
+pytest
+```
 
-- Comment creation is currently staff-only (comment ownership permissions are a planned fast-follow).
-- `REMOTE_ADDR`-based rate limiting assumes no reverse proxy; behind one, `X-Forwarded-For` handling (trusting only the proxy) is required.
-- Free-tier hosting spins down after inactivity — first request after idle may be slow. <!-- CHECK: keep or remove depending on final hosting -->
+The native test environment requires PostgreSQL configuration through `.env.example`.
 
-## Roadmap
-
-- OWASP ZAP baseline scan with documented findings and remediation (`docs/zap-scan-report.md`)
-- Load testing with locust (p95 latency under 50 concurrent users, reported locally and deployed)
-- Comment ownership permissions
+A live Redis instance is not required during testing because `fakeredis` is injected through an automatically applied fixture.
 
 ---
 
-<!-- CHECK: add your name / links -->
-Built by Marie <!-- CHECK --> as a security-focused backend portfolio project.
+## Known Limitations
+
+* Comment creation is currently restricted to staff users. Object-level comment ownership permissions are planned.
+* Rate limiting currently uses `REMOTE_ADDR`.
+* Deployments behind a reverse proxy will require trusted-proxy configuration and careful handling of forwarded IP headers.
+* Free-tier hosting may introduce a delayed response after periods of inactivity.
+
+
